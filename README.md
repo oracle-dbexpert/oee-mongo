@@ -4,7 +4,7 @@ v0.0.1 - PoC
 
     Performs MongoDB profiling operations and analyzes the profiling data to generate an HTML report. 
 
-    JS conversion of [MongoDB compatibility advisor for Autonomous MongoDB AP](https://github.com/oracle-devrel/technology-engineering/tree/main/data-platform/autonomous-database/autonomous-json/mongodb-compatibility-advisor-19c)
+JS conversion of [MongoDB compatibility advisor for Autonomous MongoDB AP](https://github.com/oracle-devrel/technology-engineering/tree/main/data-platform/autonomous-database/autonomous-json/mongodb-compatibility-advisor-19c)
 
 
 Install:
