@@ -10,7 +10,10 @@
 // 3. Purge profiling data for a MongoDB database
 // 4. Export MongoDB profiling data to user specified location
 // 5. Analyze exported MongoDB workload profile
+// 6. Collect historical metrics on CPU, memory, storage utilization, and sessions of the database
 //
+// Limitations:
+// Cumulative Metrics: The metrics collected using serverStatus are cumulative since the last server restart
 
 const fs = require('fs');
 const { MongoClient } = require('mongodb');
@@ -104,11 +107,11 @@ function summarize_keywords(supported_dictionary, not_supported_dictionary) {
 }
 
 // Function to generate the report as an HTML file
-function generate_html_report(supported_dictionary, not_supported_dictionary, supported_commands, not_supported_commands, output_file) {
+function generate_html_report(supported_dictionary, not_supported_dictionary, supported_commands, not_supported_commands, output_file, metrics = null) {
     const { total_keywords, total_supported, total_not_supported, supported_percent } = summarize_keywords(supported_dictionary, not_supported_dictionary);
 
     // Create HTML content
-    const html_content = `
+    let html_content = `
     <html>
     <head>
         <title>MongoDB Advisor Report</title>
@@ -125,6 +128,7 @@ function generate_html_report(supported_dictionary, not_supported_dictionary, su
             .collapsible { background-color: #f2f2f2; cursor: pointer; padding: 10px; border: 1px solid #ddd; margin-bottom: 5px; }
             .content { display: none; padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; }
             strong { color: red; }
+            pre { white-space: pre-wrap; word-wrap: break-word; }
         </style>
     </head>
     <body>
@@ -149,7 +153,17 @@ function generate_html_report(supported_dictionary, not_supported_dictionary, su
             <tr><th>Operator</th><th>Count</th></tr>
             ${Object.entries(not_supported_dictionary).map(([key, value]) => `<tr><td>${key}</td><td class="center-align">${value}</td></tr>`).join('')}
         </table>
+    `;
 
+    // Include Metrics if available
+    if (metrics) {
+        html_content += `
+        <h2>Metrics Collected via MongoDB</h2>
+        <pre>${JSON.stringify(metrics, null, 4)}</pre>
+        `;
+    }
+
+    html_content += `
         <h2>Details of Supported Commands</h2>
         ${supported_commands.map((command, i) => `
         <div class="collapsible">Supported Command ${i + 1}</div>
@@ -184,7 +198,7 @@ function generate_html_report(supported_dictionary, not_supported_dictionary, su
         </div>
 
         <div class="summary">
-            <p><strong>Note:</strong> Operations not supported. Insert and updates could not be accurate as they appear more in the log.</p>
+            <p><strong>Note:</strong> Operations not supported. Inserts and updates may not be accurate as they appear more in the log.</p>
         </div>
 
         <script>
@@ -235,6 +249,46 @@ async function export_profiling_data(client, db_name, output_file) {
     console.log(`Profiling data exported to '${output_file}'.`);
 }
 
+// Function to collect cumulative metrics since the last reset of the database
+async function collect_lifetime_metrics(client, output_file) {
+    const adminDb = client.db('admin');
+
+    // Get server status
+    const serverStatus = await adminDb.command( { serverStatus: 1,  repl: 1 });
+
+    // Get cumulative metrics
+    const metrics = {
+        timestamp: new Date().toISOString(),
+        uptimeSeconds: serverStatus.uptime, // Uptime in seconds
+        connections: serverStatus.connections,
+        opcounters: serverStatus.opcounters, // Cumulative operation counters
+        opcountersRepl: serverStatus.opcountersRepl, // For replica sets
+        network: serverStatus.network, // Network statistics
+        memory: serverStatus.mem, // Memory usage (note: may vary by platform)
+        extra_info: serverStatus.extra_info, // May include CPU info on some platforms
+        metrics: serverStatus.metrics, // Detailed metrics
+        wiredTiger: serverStatus.wiredTiger, // WiredTiger engine stats
+        sessions: serverStatus.logicalSessionRecordCache, // Session information
+        // Add other relevant fields as needed
+    };
+
+    // Get database statistics
+    const databases = await adminDb.admin().listDatabases();
+
+    const dbStats = {};
+    for (const dbInfo of databases.databases) {
+        const db = client.db(dbInfo.name);
+        const stats = await db.command({ dbStats: 1, scale: 1 });
+        dbStats[dbInfo.name] = stats;
+    }
+
+    // Include database stats
+    metrics.dbStats = dbStats;
+
+    fs.writeFileSync(output_file, JSON.stringify(metrics, null, 4), 'utf8');
+    console.log(`Metrics collected and saved to '${output_file}'.`);
+}
+
 // Main function
 async function main() {
     const readline = require('readline');
@@ -254,36 +308,37 @@ async function main() {
     console.log("3: Purge profiling data for the MongoDB database");
     console.log("4: Export profiling data to a JSON file");
     console.log("5: Analyze a MongoDB profile JSON file to create a report");
+    console.log("6: Collect historical metrics via MongoDB native commands");
 
     const mode = await question("Enter the mode number: ");
 
     // mongodb+srv://<username>:<password>@dxxyyzz.mongodb.net/
     if (mode === "1") {
         // Prompt user for MongoDB connection string
-        const connection_string = await question("Enter the MongoDB connection string(e.g. mongodb://localhost:27017): ");
-        const client = new MongoClient(connection_string);  // Connect to MongoDB using the provided connection string
+        const connection_string = await question("Enter the MongoDB connection string (e.g., mongodb://localhost:27017): ");
+        const client = new MongoClient(connection_string);
         await client.connect();
         const db_name = await question("Enter the database name: ");
         await enable_profiling(client, db_name);
         await client.close();
     } else if (mode === "2") {
-        const connection_string = await question("Enter the MongoDB connection string(e.g. mongodb://localhost:27017): ");
-        const client = new MongoClient(connection_string);  // Connect to MongoDB using the provided connection string
+        const connection_string = await question("Enter the MongoDB connection string (e.g., mongodb://localhost:27017): ");
+        const client = new MongoClient(connection_string);
         await client.connect();
         const db_name = await question("Enter the database name: ");
         await disable_profiling(client, db_name);
         await client.close();
     } else if (mode === "3") {
-        const connection_string = await question("Enter the MongoDB connection string(e.g. mongodb://localhost:27017): ");
-        const client = new MongoClient(connection_string);  // Connect to MongoDB using the provided connection string
+        const connection_string = await question("Enter the MongoDB connection string (e.g., mongodb://localhost:27017): ");
+        const client = new MongoClient(connection_string);
         await client.connect();
         const db_name = await question("Enter the database name: ");
         await disable_profiling(client, db_name);
         await purge_profiling_data(client, db_name);
         await client.close();
     } else if (mode === "4") {
-        const connection_string = await question("Enter the MongoDB connection string(e.g. mongodb://localhost:27017): ");
-        const client = new MongoClient(connection_string);  // Connect to MongoDB using the provided connection string
+        const connection_string = await question("Enter the MongoDB connection string (e.g., mongodb://localhost:27017): ");
+        const client = new MongoClient(connection_string);
         await client.connect();
         const db_name = await question("Enter the database name: ");
         const output_file = await question("Enter the output JSON file name: ");
@@ -296,13 +351,31 @@ async function main() {
         // Analyze the keywords in the JSON data
         const { supported_dictionary, not_supported_dictionary, supported_commands, not_supported_commands } = analyze_keywords(data);
 
+        // Ask if user wants to include metrics
+        const include_metrics = await question("Do you have metrics data collected via MongoDB to include in the report? (yes/no): ");
+
+        let metrics = null;
+        if (include_metrics.toLowerCase() === 'yes') {
+            const metrics_file = await question("Enter the path to the metrics JSON file: ");
+            metrics = load_json(metrics_file);
+        }
+
         // Create the output file name with timestamp
         const timestamp = new Date().toISOString().replace(/:/g, '_').replace(/\..+/, '');
         const base_name = path.basename(file_path, path.extname(file_path));
         const output_file = `${base_name}_report_advisor_${timestamp}.html`;
 
-        generate_html_report(supported_dictionary, not_supported_dictionary, supported_commands, not_supported_commands, output_file);
+        generate_html_report(supported_dictionary, not_supported_dictionary, supported_commands, not_supported_commands, output_file, metrics);
         console.log(`HTML report has been generated and saved as '${output_file}'.`);
+    } else if (mode === "6") {
+        const connection_string = await question("Enter the MongoDB connection string (e.g., mongodb://localhost:27017): ");
+        const client = new MongoClient(connection_string);
+        await client.connect();
+
+        const output_file = await question("Enter the output JSON file name for metrics: ");
+        await collect_lifetime_metrics(client, output_file);
+
+        await client.close();
     } else {
         console.log("Invalid mode selected.");
     }
