@@ -22,3 +22,4 @@ How to use:
     3. Purge profiling data for a MongoDB database
     4. Export MongoDB profiling data to user specified location
     5. Analyze exported MongoDB workload profile
+    6. Collect historical metrics on CPU, memory, storage utilization, and sessions of the database
