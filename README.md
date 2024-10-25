@@ -23,3 +23,4 @@ How to use:
     4. Export MongoDB profiling data to user specified location
     5. Analyze exported MongoDB workload profile
     6. Collect historical metrics on CPU, memory, storage utilization, and sessions of the database
+    7. Perform rudimentary sizing based on provided metrics JSON file
