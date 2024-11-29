@@ -1,11 +1,21 @@
 # oee-mongo
 
-v0.0.1 - PoC
+**Version:** v0.0.1  
+**Status:** Proof of Concept (PoC)  
 
-    Performs MongoDB profiling operations and analyzes the profiling data to generate an HTML report. 
+This tool extends functionality with new **Option 6** and **Option 7**, introducing metrics collection and a basic size reporting feature.  
 
-JS conversion of [MongoDB compatibility advisor for Autonomous MongoDB API](https://github.com/oracle-devrel/technology-engineering/tree/main/data-platform/autonomous-database/autonomous-json/mongodb-compatibility-advisor-19c)
+### Features:
 
+- **Enhanced Capabilities:**  
+  - A JavaScript-based conversion of the [MongoDB Compatibility Advisor for Autonomous MongoDB API](https://github.com/oracle-devrel/technology-engineering/tree/main/data-platform/autonomous-database/autonomous-json/mongodb-compatibility-advisor-19c), enriched with additional features like basic metrics collection and sizing.
+
+- **MongoDB Profiling and Analysis:**  
+  - Executes profiling operations on MongoDB databases
+  - Collects profiling data and performance metrics.  
+
+- **Data Analysis and Reporting:**  
+  - Analyzes the collected data to generate basic HTML reports, offering insights into database useage patterns, sizing requirements, and MongoDB API Compatibility.
 
 Install:
 
