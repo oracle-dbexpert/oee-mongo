@@ -19,7 +19,7 @@ This tool extends functionality with new **Option 6** and **Option 7**, introduc
 
 Install:
 
-`npm install mongodb`
+`npm install`
 
 How to use:
 
